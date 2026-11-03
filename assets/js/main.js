@@ -1,10 +1,27 @@
 const sections = Array.from(document.querySelectorAll(".reel"));
+const animatedSections = sections.map((section) => ({
+  section,
+  elements: Array.from(section.querySelectorAll("h1, h2, h3, .line")),
+  top: section.offsetTop,
+  height: section.offsetHeight,
+  lastProgress: undefined,
+  lastViewportCenterOffset: undefined
+}));
+const mobileViewport = window.matchMedia("(max-width: 768px)");
 let currentSection = 0;
 let isNavigatingSection = false;
+let homeButtonWasVisible = window.scrollY > 8;
 let navigationTimeout;
 let sectionScrollFrame;
 let previousScrollBehavior;
 let previousScrollSnapType;
+
+function refreshSectionMeasurements() {
+  animatedSections.forEach((entry) => {
+    entry.top = entry.section.offsetTop;
+    entry.height = entry.section.offsetHeight;
+  });
+}
 
 function finishSectionNavigation() {
   if (!isNavigatingSection || sectionScrollFrame !== undefined) {
@@ -13,6 +30,22 @@ function finishSectionNavigation() {
 
   isNavigatingSection = false;
   window.clearTimeout(navigationTimeout);
+}
+
+function setHomeButtonVisibility(homeButton, shouldShow) {
+  const shouldFlash = shouldShow && !homeButtonWasVisible;
+  homeButtonWasVisible = shouldShow;
+  homeButton.classList.toggle("is-visible", shouldShow);
+  homeButton.style.pointerEvents = shouldShow ? "auto" : "none";
+
+  if (!shouldFlash || reducedMotion) {
+    return;
+  }
+
+  homeButton.classList.remove("is-flashing");
+  void homeButton.offsetWidth;
+  homeButton.classList.add("is-flashing");
+  window.setTimeout(() => homeButton.classList.remove("is-flashing"), 650);
 }
 
 window.addEventListener("scroll", () => {
@@ -40,135 +73,102 @@ function updateActiveSection() {
 
   const homeButton = document.querySelector(".home-button");
   if (homeButton) {
-    const isHomeSection = sections[currentSection]?.id === "startseite";
-    homeButton.style.opacity = isHomeSection ? "0" : "1";
-    homeButton.style.pointerEvents = isHomeSection ? "none" : "auto";
+    setHomeButtonVisibility(homeButton, window.scrollY > 8);
   }
 }
 
-const sectionAnimations = new WeakMap();
+function syncHomeButtonVisibility() {
+  const homeButton = document.querySelector(".home-button");
+  if (!homeButton) {
+    return;
+  }
 
-function clearSectionAnimations(section) {
-  sectionAnimations.get(section)?.forEach(({ animation, clone, original, visibility }) => {
-    animation.cancel();
-    clone.remove();
-    original.style.visibility = visibility;
-  });
-  sectionAnimations.delete(section);
+  setHomeButtonVisibility(homeButton, window.scrollY > 8);
 }
 
-function animateSectionHeadings(section, startX, endX, entering = false, duration = 700) {
-  clearSectionAnimations(section);
-  const sectionTop = section.getBoundingClientRect().top;
-  const animations = Array.from(section.querySelectorAll("h1, h2, h3, .line"), (original) => {
-    const computed = window.getComputedStyle(original);
-    const rect = original.getBoundingClientRect();
-    const isLine = original.matches(".line");
-    const isVerticallyCenteredHeading = original.matches("h1, h2");
-    const top = isLine
-      ? window.innerHeight * 0.44
-      : entering
-        ? isVerticallyCenteredHeading
-          ? original.offsetTop - original.offsetHeight / 2
-          : rect.top - sectionTop
-        : rect.top;
-    const clone = original.cloneNode(true);
-    clone.removeAttribute("id");
-    clone.classList.add("heading-transition-clone");
-    clone.setAttribute("aria-hidden", "true");
-    clone.style.position = "fixed";
-    clone.style.left = isLine ? `${window.innerWidth * 0.01}px` : `${rect.left}px`;
-    clone.style.top = `${top}px`;
-    clone.style.bottom = "auto";
-    clone.style.width = isLine ? "98vw" : `${original.offsetWidth}px`;
-    clone.style.height = isLine ? "0" : `${original.offsetHeight}px`;
-    clone.style.margin = "0";
-    clone.style.zIndex = computed.zIndex;
-    clone.style.font = computed.font;
-    clone.style.letterSpacing = computed.letterSpacing;
-    clone.style.lineHeight = computed.lineHeight;
-    clone.style.color = computed.color;
-    clone.style.webkitTextStroke = computed.webkitTextStroke;
-    clone.style.textShadow = computed.textShadow;
-    clone.style.textAlign = computed.textAlign;
-    clone.style.opacity = entering ? "1" : computed.opacity;
-    if (isLine) {
-      clone.style.borderTop = computed.borderTop;
-      clone.style.borderRadius = computed.borderRadius;
-      clone.style.transform = "none";
-    } else {
-      clone.style.transform = "none";
+function updateScrollLinkedAnimations() {
+  const scrollPosition = window.scrollY;
+
+  let closestSection = currentSection;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  animatedSections.forEach((entry, index) => {
+    const { section, elements, top, height } = entry;
+    const distance = Math.abs(top - scrollPosition);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestSection = index;
     }
 
-    document.body.append(clone);
-    const visibility = original.style.visibility;
-    original.style.visibility = "hidden";
-
-    const animation = clone.animate(
-      [{ translate: `${startX}vw 0` }, { translate: `${endX}vw 0` }],
-      { duration, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)", fill: "both" }
-    );
-    const record = { animation, clone, original, visibility };
-    animation.onfinish = () => {
-      clone.remove();
-      original.style.visibility = visibility;
-      const activeAnimations = sectionAnimations.get(section);
-      if (activeAnimations) {
-        const remaining = activeAnimations.filter((item) => item !== record);
-        if (remaining.length) {
-          sectionAnimations.set(section, remaining);
-        } else {
-          sectionAnimations.delete(section);
-        }
-      }
-    };
-    return record;
+    const progress = Math.max(-1, Math.min(1, (scrollPosition - top) / height));
+    if (progress !== entry.lastProgress) {
+      const visibility = 1 - Math.abs(progress);
+      section.style.setProperty("--reel-progress", String(progress));
+      section.style.setProperty("--reel-visibility", String(visibility));
+      const horizontalOffset = `${-progress * (mobileViewport.matches ? 50 : 100)}vw`;
+      elements.forEach((element) => {
+        element.style.translate = mobileViewport.matches
+          ? horizontalOffset
+          : `${horizontalOffset} ${scrollPosition - top}px`;
+      });
+      entry.lastProgress = progress;
+    }
   });
-  sectionAnimations.set(section, animations);
+
+  return closestSection;
 }
 
-function setActiveSection(index, direction = Math.sign(index - currentSection), duration = 700) {
+function setActiveSection(index) {
   if (index < 0 || index >= sections.length || index === currentSection) {
     return;
   }
 
-  const previousSection = sections[currentSection];
-  const nextSection = sections[index];
-
-  animateSectionHeadings(previousSection, 0, direction > 0 ? -100 : 100, false, duration);
   currentSection = index;
   updateActiveSection();
-  animateSectionHeadings(nextSection, direction > 0 ? 100 : -100, 0, true, duration);
 }
 
-const sectionObserver = new IntersectionObserver((entries) => {
-  const mostVisibleSection = entries
-    .filter((entry) => entry.isIntersecting)
-    .sort((first, second) => second.intersectionRatio - first.intersectionRatio)[0];
-
-  if (!mostVisibleSection) {
+let scrollUpdateFrame;
+function scheduleScrollLinkedUpdate() {
+  if (scrollUpdateFrame !== undefined) {
     return;
   }
-  const sectionIndex = sections.indexOf(mostVisibleSection.target);
-  if (!isNavigatingSection && sectionIndex !== -1) {
-    setActiveSection(sectionIndex);
-  }
-}, { threshold: [0.6] });
 
-sections.forEach((section) => sectionObserver.observe(section));
+  scrollUpdateFrame = window.requestAnimationFrame(() => {
+    scrollUpdateFrame = undefined;
+    syncHomeButtonVisibility();
+    const closestSection = updateScrollLinkedAnimations();
+
+    if (!isNavigatingSection && sections.length) {
+      setActiveSection(closestSection);
+    }
+  });
+}
+
+window.addEventListener("scroll", scheduleScrollLinkedUpdate, { passive: true });
+window.addEventListener("resize", () => {
+  refreshSectionMeasurements();
+  resizeSparkCanvas();
+  if (!mobileViewport.matches) {
+    scheduleSparkAnimation();
+  }
+  scheduleScrollLinkedUpdate();
+}, { passive: true });
 
 function goToSection(index) {
   if (document.body.classList.contains("is-loading") ||
-      index < 0 || index >= sections.length || index === currentSection) {
+      index < 0 || index >= sections.length) {
+    return;
+  }
+
+  const destination = sections[index].getBoundingClientRect().top + window.scrollY;
+  if (Math.abs(destination - window.scrollY) < 1) {
     return;
   }
 
   const isInterruptingNavigation = sectionScrollFrame !== undefined;
   window.cancelAnimationFrame(sectionScrollFrame);
   const start = window.scrollY;
-  const destination = sections[index].offsetTop;
   const distance = Math.abs(index - currentSection);
-  const duration = Math.max(700, distance * 240);
+  const duration = Math.max(800, distance * 240);
   const startedAt = performance.now();
   const scrollBehavior = isInterruptingNavigation
     ? previousScrollBehavior
@@ -181,7 +181,7 @@ function goToSection(index) {
   document.documentElement.style.scrollBehavior = "auto";
   document.documentElement.style.scrollSnapType = "none";
 
-  setActiveSection(index, Math.sign(index - currentSection), duration);
+  setActiveSection(index);
   isNavigatingSection = true;
   window.clearTimeout(navigationTimeout);
   navigationTimeout = window.setTimeout(finishSectionNavigation, duration + 150);
@@ -217,6 +217,7 @@ function setFavicon() {
 
 setFavicon();
 updateActiveSection();
+updateScrollLinkedAnimations();
 
 const pageLoader = document.querySelector(".page-loader");
 if (pageLoader) {
@@ -252,45 +253,144 @@ const sparkContext = sparkCanvas?.getContext("2d");
 const sparks = [];
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 let lastFrameTime = 0;
+let sparkAnimationFrame;
+let activeFlame;
+const rapidClicks = [];
+
+function scheduleSparkAnimation() {
+  if (sparkAnimationFrame === undefined && !reducedMotion) {
+    sparkAnimationFrame = window.requestAnimationFrame(animateSparks);
+  }
+}
 
 function resizeSparkCanvas() {
   if (!sparkCanvas || !sparkContext) {
     return;
   }
 
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const pixelRatio = mobileViewport.matches
+    ? 1
+    : Math.min(window.devicePixelRatio || 1, 2);
   sparkCanvas.width = Math.round(window.innerWidth * pixelRatio);
   sparkCanvas.height = Math.round(window.innerHeight * pixelRatio);
   sparkContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 }
 
 function addSparkBurst(x, y, amount, radius = amount > 20 ? 46 : 24) {
-  for (let index = 0; index < amount && sparks.length < 180; index += 1) {
+  const particleCount = mobileViewport.matches ? Math.max(1, Math.ceil(amount * 0.35)) : amount;
+  const maxSparks = mobileViewport.matches ? 32 : 72;
+  for (let index = 0; index < particleCount && sparks.length < maxSparks; index += 1) {
     const angle = amount > 20
       ? (index / amount) * Math.PI * 2 + (Math.random() - 0.5) * 0.12
       : Math.random() * Math.PI * 2;
     const spread = amount > 20 ? 42 : 22;
     const originAngle = Math.random() * Math.PI * 2;
     const originRadius = Math.sqrt(Math.random()) * spread;
-    const life = 150 + Math.random() * 90;
+    const speed = amount > 20 ? 0.9 + Math.random() * 2.3 : 0.5 + Math.random() * 1.5;
+    const life = 38 + Math.random() * 35;
+    const originX = x + Math.cos(originAngle) * originRadius;
+    const originY = y + Math.sin(originAngle) * originRadius;
     sparks.push({
-      originX: x + Math.cos(originAngle) * originRadius,
-      originY: y + Math.sin(originAngle) * originRadius,
-      angle,
-      angularSpeed: (0.008 + Math.random() * 0.008) * (Math.random() < 0.5 ? -1 : 1),
-      radius: Math.random() * 5,
-      radiusLimit: radius * (0.8 + Math.random() * 0.4),
-      radialSpeed: 0.1 + Math.random() * 0.12,
-      riseSpeed: amount === 1 ? 0.07 : 0.015,
+      x: originX,
+      y: originY,
+      previousX: originX,
+      previousY: originY,
+      velocityX: Math.cos(angle) * speed,
+      velocityY: Math.sin(angle) * speed - (amount > 20 ? 0.45 : 0.18),
+      gravity: 0.022 + Math.random() * 0.022,
+      drag: 0.982 + Math.random() * 0.012,
       life,
       maxLife: life,
-      size: 1.4 + Math.random() * (amount > 20 ? 2.2 : 1.8),
-      hue: 20 + Math.random() * 30
+      size: 0.7 + Math.random() * (amount > 20 ? 1.5 : 1.2),
+      hue: 24 + Math.random() * 22
     });
   }
+  scheduleSparkAnimation();
+}
+
+function drawFlame(time) {
+  if (!activeFlame) {
+    return;
+  }
+
+  const remaining = activeFlame.expiresAt - time;
+  if (remaining <= 0) {
+    activeFlame = undefined;
+    return;
+  }
+
+  const age = 1 - remaining / 2000;
+  const flicker = Math.sin(time * 0.025) * 3.5 + Math.sin(time * 0.047) * 2;
+  const heightFlicker = Math.sin(time * 0.031) * 5 + Math.sin(time * 0.013) * 3;
+  activeFlame.x += (activeFlame.targetX - activeFlame.x) * 0.24;
+  activeFlame.y += (activeFlame.targetY - activeFlame.y) * 0.24;
+  activeFlame.tilt += (activeFlame.targetTilt - activeFlame.tilt) * 0.14;
+  activeFlame.targetTilt *= 0.9;
+
+  if (!sparkContext) {
+    return;
+  }
+
+  sparkContext.save();
+  sparkContext.globalAlpha = Math.min(1, remaining / 180) * (0.9 + Math.sin(time * 0.018) * 0.08);
+  sparkContext.translate(activeFlame.x, activeFlame.y);
+  sparkContext.rotate(activeFlame.tilt);
+  sparkContext.scale(1.05 + age * 0.12, 0.96 + Math.sin(time * 0.019) * 0.1);
+
+  sparkContext.shadowColor = "rgba(255, 104, 18, 0.9)";
+  sparkContext.shadowBlur = 30;
+  sparkContext.beginPath();
+  sparkContext.moveTo(-8, 0);
+  sparkContext.bezierCurveTo(-19, -12, -12, -27, -7, -40);
+  sparkContext.bezierCurveTo(-2, -33, 3, -45, 1, -56);
+  sparkContext.bezierCurveTo(2, -66, 8, -72, 7 + flicker, -82 - heightFlicker);
+  sparkContext.bezierCurveTo(22 + flicker, -62, 24, -45, 16, -31);
+  sparkContext.bezierCurveTo(21, -17, 15, -6, 8, 0);
+  sparkContext.closePath();
+  const outerGradient = sparkContext.createLinearGradient(0, -88, 0, 0);
+  outerGradient.addColorStop(0, "rgba(255, 76, 8, 0.12)");
+  outerGradient.addColorStop(0.24, "rgba(255, 74, 5, 0.94)");
+  outerGradient.addColorStop(0.68, "rgba(255, 137, 13, 0.98)");
+  outerGradient.addColorStop(1, "rgba(255, 207, 72, 0.9)");
+  sparkContext.fillStyle = outerGradient;
+  sparkContext.fill();
+
+  sparkContext.beginPath();
+  sparkContext.moveTo(-4, 0);
+  sparkContext.bezierCurveTo(-11, -12, -5, -23, -4, -33);
+  sparkContext.bezierCurveTo(-2, -43, 3, -50, 5 + flicker * 0.55, -62 - heightFlicker * 0.6);
+  sparkContext.bezierCurveTo(15, -44, 13, -29, 8, -17);
+  sparkContext.bezierCurveTo(10, -9, 7, -3, 4, 0);
+  sparkContext.closePath();
+  sparkContext.shadowBlur = 10;
+  const innerGradient = sparkContext.createLinearGradient(0, -67, 0, 0);
+  innerGradient.addColorStop(0, "rgba(255, 172, 28, 0.08)");
+  innerGradient.addColorStop(0.38, "rgba(255, 204, 48, 0.94)");
+  innerGradient.addColorStop(1, "rgba(255, 250, 207, 0.98)");
+  sparkContext.fillStyle = innerGradient;
+  sparkContext.fill();
+
+  sparkContext.shadowBlur = 0;
+  sparkContext.beginPath();
+  sparkContext.moveTo(-4, 0);
+  sparkContext.bezierCurveTo(-8, -5, -5, -11, 0, -16);
+  sparkContext.bezierCurveTo(6, -10, 7, -4, 4, 0);
+  sparkContext.closePath();
+  sparkContext.fillStyle = "rgba(255, 249, 218, 0.94)";
+  sparkContext.fill();
+
+  sparkContext.beginPath();
+  sparkContext.ellipse(0, -1, 7, 3, 0, 0, Math.PI * 2);
+  const baseGlow = sparkContext.createRadialGradient(0, -1, 0, 0, -1, 10);
+  baseGlow.addColorStop(0, "rgba(181, 224, 255, 0.75)");
+  baseGlow.addColorStop(1, "rgba(63, 130, 255, 0)");
+  sparkContext.fillStyle = baseGlow;
+  sparkContext.fill();
+  sparkContext.restore();
 }
 
 function animateSparks(time) {
+  sparkAnimationFrame = undefined;
   if (!sparkContext || !sparkCanvas || reducedMotion) {
     return;
   }
@@ -299,7 +399,7 @@ function animateSparks(time) {
   lastFrameTime = time;
   sparkContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-  if (sparks.length < 48 && Math.random() < 0.035) {
+  if (!mobileViewport.matches && sparks.length < 48 && Math.random() < 0.035) {
     addSparkBurst(Math.random() * window.innerWidth, window.innerHeight + 4, 1);
   }
 
@@ -314,29 +414,52 @@ function animateSparks(time) {
       continue;
     }
 
-    const alpha = Math.pow(spark.life / spark.maxLife, 2.2) * 0.68;
-    const x = spark.originX + Math.cos(spark.angle) * spark.radius;
-    const y = spark.originY + Math.sin(spark.angle) * spark.radius - (spark.maxLife - spark.life) * spark.riseSpeed;
+    const lifeRatio = spark.life / spark.maxLife;
+    const alpha = Math.pow(lifeRatio, 1.8) * 0.9;
+    spark.previousX = spark.x;
+    spark.previousY = spark.y;
+    spark.velocityX *= Math.pow(spark.drag, frameScale);
+    spark.velocityY = spark.velocityY * Math.pow(spark.drag, frameScale) + spark.gravity * frameScale;
+    spark.x += spark.velocityX * frameScale;
+    spark.y += spark.velocityY * frameScale;
+
     sparkContext.beginPath();
-    sparkContext.fillStyle = `hsla(${spark.hue}, 100%, 68%, ${alpha})`;
-    sparkContext.shadowColor = `hsla(${spark.hue}, 100%, 60%, ${alpha})`;
-    sparkContext.shadowBlur = spark.size * 3.5;
-    sparkContext.arc(x, y, spark.size * alpha * 1.2, 0, Math.PI * 2);
+    sparkContext.moveTo(spark.previousX, spark.previousY);
+    sparkContext.lineTo(spark.x, spark.y);
+    sparkContext.lineCap = "round";
+    sparkContext.strokeStyle = `hsla(${spark.hue}, 100%, 62%, ${alpha * 0.7})`;
+    sparkContext.lineWidth = Math.max(0.35, spark.size * alpha);
+    sparkContext.shadowColor = `hsla(${spark.hue}, 100%, 58%, ${alpha})`;
+    sparkContext.shadowBlur = mobileViewport.matches ? 0 : spark.size * 2.5;
+    sparkContext.stroke();
+
+    const coreRadius = Math.max(0.25, spark.size * lifeRatio);
+    sparkContext.beginPath();
+    if (mobileViewport.matches) {
+      sparkContext.fillStyle = `hsla(${spark.hue}, 100%, 76%, ${alpha})`;
+      sparkContext.arc(spark.x, spark.y, coreRadius, 0, Math.PI * 2);
+    } else {
+      const core = sparkContext.createRadialGradient(
+        spark.x, spark.y, 0, spark.x, spark.y, coreRadius * 2.2
+      );
+      core.addColorStop(0, `rgba(255, 255, 225, ${alpha})`);
+      core.addColorStop(0.28, `hsla(${spark.hue}, 100%, 76%, ${alpha})`);
+      core.addColorStop(1, `hsla(${spark.hue}, 100%, 55%, 0)`);
+      sparkContext.fillStyle = core;
+      sparkContext.arc(spark.x, spark.y, coreRadius * 2.2, 0, Math.PI * 2);
+    }
     sparkContext.fill();
   }
 
+  drawFlame(time);
   sparkContext.shadowBlur = 0;
-  window.requestAnimationFrame(animateSparks);
+  if (sparks.length || activeFlame) {
+    scheduleSparkAnimation();
+  }
 }
 
 if (sparkCanvas && sparkContext && !reducedMotion) {
   resizeSparkCanvas();
-  window.addEventListener("resize", resizeSparkCanvas);
-  addSparkBurst(window.innerWidth / 2, window.innerHeight * 0.58, 32);
-  for (let index = 0; index < 24; index += 1) {
-    addSparkBurst(Math.random() * window.innerWidth, Math.random() * window.innerHeight, 1);
-  }
-  window.requestAnimationFrame(animateSparks);
 
   let lastDragPosition;
   let lastDragSparkTime = 0;
@@ -348,6 +471,17 @@ if (sparkCanvas && sparkContext && !reducedMotion) {
   }, { passive: true });
 
   document.addEventListener("pointermove", (event) => {
+    if (activeFlame) {
+      const elapsed = Math.max(1, performance.now() - activeFlame.lastMoveTime);
+      const velocityX = (event.clientX - activeFlame.lastPointerX) / elapsed;
+      activeFlame.targetX = event.clientX;
+      activeFlame.targetY = event.clientY;
+      activeFlame.targetTilt = Math.max(-0.65, Math.min(0.65, -velocityX * 0.65));
+      activeFlame.lastPointerX = event.clientX;
+      activeFlame.lastPointerY = event.clientY;
+      activeFlame.lastMoveTime = performance.now();
+    }
+
     if (!lastDragPosition || event.buttons === 0) {
       return;
     }
@@ -374,6 +508,29 @@ if (sparkCanvas && sparkContext && !reducedMotion) {
       return;
     }
 
+    const now = performance.now();
+    rapidClicks.push({ time: now, x: event.clientX, y: event.clientY });
+    while (rapidClicks.length && now - rapidClicks[0].time > 2000) {
+      rapidClicks.shift();
+    }
+
+    if (rapidClicks.length >= 15 && !reducedMotion) {
+      activeFlame = {
+        x: event.clientX,
+        y: event.clientY,
+        targetX: event.clientX,
+        targetY: event.clientY,
+        lastPointerX: event.clientX,
+        lastPointerY: event.clientY,
+        lastMoveTime: now,
+        tilt: 0,
+        targetTilt: 0,
+        expiresAt: now + 2000
+      };
+      addSparkBurst(event.clientX, event.clientY, 20, 32);
+      rapidClicks.length = 0;
+    }
+
     const isHomeButton = target.closest(".home-button");
     const rect = isHomeButton?.getBoundingClientRect();
     const x = rect ? rect.left + rect.width / 2 : event.clientX;
@@ -381,6 +538,44 @@ if (sparkCanvas && sparkContext && !reducedMotion) {
     addSparkBurst(x, y, isHomeButton ? 38 : 12, isHomeButton ? 58 : 26);
   });
 }
+
+if ("IntersectionObserver" in window) {
+  const videoObserver = new IntersectionObserver((entries) => {
+    entries.forEach(({ isIntersecting, target }) => {
+      const video = target;
+      if (isIntersecting) {
+        const source = video.querySelector("source[data-src]");
+        if (source) {
+          source.src = source.dataset.src;
+          source.removeAttribute("data-src");
+          video.load();
+        }
+        video.play().catch((error) => {
+          if (error.name !== "AbortError") {
+            console.warn("Could not resume an in-view background video.", error);
+          }
+        });
+      } else {
+        video.pause();
+      }
+    });
+  }, { threshold: 0.01 });
+
+  document.querySelectorAll(".bg-video, .bg-video_1").forEach((video) => {
+    videoObserver.observe(video);
+  });
+} else {
+  document.querySelectorAll(".bg-video, .bg-video_1").forEach((video) => {
+    const source = video.querySelector("source[data-src]");
+    if (source) {
+      source.src = source.dataset.src;
+      source.removeAttribute("data-src");
+      video.load();
+    }
+  });
+}
+
+syncHomeButtonVisibility();
 
 window.addEventListener("keydown", (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey ||
@@ -409,8 +604,19 @@ document.querySelector(".home-button")?.addEventListener("click", (event) => {
 });
 
 let wheelHandled = false;
-let wheelDirection = 0;
 let wheelResetTimeout;
+
+function scheduleWheelReset() {
+  window.clearTimeout(wheelResetTimeout);
+  wheelResetTimeout = window.setTimeout(() => {
+    if (isNavigatingSection) {
+      scheduleWheelReset();
+      return;
+    }
+
+    wheelHandled = false;
+  }, 120);
+}
 
 window.addEventListener("wheel", (event) => {
   if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
@@ -419,18 +625,12 @@ window.addEventListener("wheel", (event) => {
 
   event.preventDefault();
   const direction = Math.sign(event.deltaY);
-
-  window.clearTimeout(wheelResetTimeout);
-  wheelResetTimeout = window.setTimeout(() => {
-    wheelHandled = false;
-    wheelDirection = 0;
-  }, 80);
+  scheduleWheelReset();
 
   if (wheelHandled) {
     return;
   }
 
   wheelHandled = true;
-  wheelDirection = direction;
   goToSection(currentSection + direction);
 }, { passive: false });
