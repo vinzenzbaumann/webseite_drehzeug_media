@@ -1,0 +1,558 @@
+@font-face {
+  font-family: "Cooper Hewitt";
+  src: url("../fonts/cooper-hewitt-latin-300-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cooper Hewitt";
+  src: url("../fonts/cooper-hewitt-latin-400-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cooper Hewitt";
+  src: url("../fonts/cooper-hewitt-latin-500-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cooper Hewitt";
+  src: url("../fonts/cooper-hewitt-latin-600-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cooper Hewitt";
+  src: url("../fonts/cooper-hewitt-latin-700-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cooper Hewitt";
+  src: url("../fonts/cooper-hewitt-latin-800-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
+/* Reset & Grundstil */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  scroll-behavior: smooth;
+  font-family: "Cooper Hewitt", sans-serif;
+  color: white;
+  background-color: black;
+  height: 100%;
+}
+
+html {
+  scroll-snap-type: y mandatory;
+}
+
+html.is-loading,
+body.is-loading {
+  overflow: hidden;
+}
+
+.page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  background: #000;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 450ms ease, visibility 450ms ease;
+}
+
+.page-loader.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.page-loader.is-flashing {
+  background: rgba(255, 255, 255, 0.4);
+  transition: background-color 100ms linear, opacity 450ms ease, visibility 450ms ease;
+}
+
+.page-loader.is-flashing .page-loader__spinner {
+  opacity: 0;
+  filter: blur(18px);
+  animation: none;
+  transition: opacity 100ms ease, filter 100ms ease;
+}
+
+.page-loader__spinner {
+  width: clamp(64px, 12vw, 110px);
+  height: auto;
+  animation: kringel-fade 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes kringel-fade {
+  from {
+    opacity: 0;
+    filter: blur(12px);
+  }
+  to {
+    opacity: 0.8;
+    filter: blur(0);
+  }
+}
+
+/* Section / Reel */
+section.reel {
+  height: 100vh;
+  width: 100vw;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  overflow: hidden;
+}
+
+section.reel--imagefilm {
+  background-image: url("../ressource/template-imagefilm.jpg");
+}
+
+section.reel--livestream {
+  background-image: url("../ressource/template-livestream.jpg");
+}
+
+section.reel--eventfilm {
+  background-image: url("../ressource/template-eventfilm.jpg");
+}
+
+section.reel--partner {
+  background-image: url("../ressource/template-partner.jpg");
+}
+
+section.reel--kontakt {
+  background-image: url("../ressource/template-kontakt.jpg");
+}
+
+section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 0; /* Hintergrund Overlay */
+}
+
+/* Content Container */
+.content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Linie */
+/* Linie nur als Kontur */
+.line {
+  position: absolute;
+  top: 44%;                /* leicht höher, sichtbar über der Mitte */
+  left: 50%;
+  width: 0;                /* Start unsichtbar */
+  border-top: 3px solid white;
+  border-radius: 100px;
+  transform: translateX(-50%); /* horizontal zentrieren */
+  color: rgb(255, 255, 255);
+  z-index: 1;
+  opacity: 100%;
+  transition: width 0.6s cubic-bezier(0.68, -0.55, 0.27, 0.9); /* federnd */
+}
+
+.reel.active .line {
+  width: 98vw; /* volle Breite */
+}
+
+
+/* Hintergrundvideo */
+.bg-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0; /* hinter allem */
+  opacity: 90%;
+}
+/*Hintergrundvideo landing page*/
+.bg-video_1 {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 180%;
+  height: 180%;
+  object-fit: cover;
+  z-index: 0;
+  filter: grayscale(120%) blur(100px) contrast(1.2); /* Nur unscharf + Kontrast */
+  opacity: 1;
+transform: rotate(90deg);
+}
+
+/* Tablets */
+@media (max-width: 1024px) {
+  .bg-video_1 {
+    width: 130%;
+    height: 130%;
+    filter: grayscale(110%) blur(70px) contrast(1.05);
+  }
+}
+
+/* Große Smartphones */
+@media (max-width: 768px) {
+  .bg-video_1 {
+    width: 120%;
+    height: 120%;
+    filter: grayscale(100%) blur(60px) contrast(1.0);
+  }
+}
+
+/* Kleine Smartphones */
+@media (max-width: 480px) {
+  .bg-video_1 {
+    width: 110%;
+    height: 110%;
+    filter: grayscale(100%) blur(50px) contrast(0.95);
+  }
+}
+
+/* Snap Scroll Verhalten */
+.reel-container {
+  height: 100%;
+  scroll-snap-type: y mandatory;
+  overflow-y: scroll;
+}
+
+.reel {
+  height: 100vh;
+  scroll-snap-align: start;
+  position: relative;
+}
+/* animations*/
+
+/* H1 Text mit „Pfützen-Effekt“ */
+h1 {
+  position: absolute;
+  left: 50%;
+  top: calc(58% - 8px / 2);
+  transform: translate(-50%, -50%) scaleY(0);
+  transform-origin: bottom;
+  font-size: clamp(3rem, 10vw, 12rem);
+  color: rgba(255, 255, 255, 0.193);                  /* Kein Fill */
+  -webkit-text-stroke: 2px white;      /* Kontur in Weiß */
+  z-index: 2;
+  opacity: 0;
+  transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              opacity 0.8s ease-out;
+}
+
+.reel.active h1 {
+  transform: translate(-50%, -50%) scaleY(1);
+  opacity: 1;
+}
+
+h6 {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 8px / 2);
+  transform: translateX(-50%) scaleY(0);
+  transform-origin: bottom;
+  font-size: clamp(3rem, 10vw, 12rem);
+  z-index: 2;
+  opacity: 0;
+}
+
+
+
+
+
+/*LANDING PAGE EYECATCHER JUUUNGE*/
+.hearthstone-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  transform: translate(-50%, -50%);
+  -webkit-user-select: none;
+  user-select: none;
+  font-size: clamp(1.8rem, 13vw, 15rem);
+  font-weight: 800;
+  color: white;
+  text-align: center;
+  letter-spacing: 0.08em;
+  text-shadow: none;
+  z-index: 3;
+  opacity: 1;
+  transition: opacity 550ms ease;
+}
+
+.is-loading .hearthstone-title {
+  opacity: 0;
+}
+
+.logo-z {
+  position: relative;
+  display: inline-block;
+}
+
+.logo-revealed .logo-z {
+  animation: logo-z-signal 84ms ease-out both;
+}
+
+.logo-z::before,
+.logo-z::after {
+  position: absolute;
+  inset: 0;
+  content: attr(data-char);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.logo-z::before {
+  color: #ff765e;
+}
+
+.logo-z::after {
+  color: #9af4ff;
+}
+
+.logo-revealed .logo-z::before {
+  animation: logo-z-slice-before 84ms steps(1, end) both;
+}
+
+.logo-revealed .logo-z::after {
+  animation: logo-z-slice-after 84ms steps(1, end) both;
+}
+
+@keyframes logo-z-signal {
+  0%, 25%, 100% { color: white; transform: translateX(0); }
+  30% { color: #111; transform: translateX(-2px) skewX(-5deg); }
+  38% { color: white; transform: translateX(1px); }
+  45% { color: #050505; transform: translateX(2px) skewX(4deg); }
+  55%, 75% { color: white; transform: translateX(0); }
+}
+
+@keyframes logo-z-slice-before {
+  0%, 29%, 72%, 100% { opacity: 0; }
+  35% { opacity: 0.8; clip-path: inset(14% 0 62%); transform: translateX(4px); }
+  41% { opacity: 0; }
+  50% { opacity: 0.65; clip-path: inset(58% 0 20%); transform: translateX(-3px); }
+  56% { opacity: 0; }
+}
+
+@keyframes logo-z-slice-after {
+  0%, 35%, 75%, 100% { opacity: 0; }
+  42% { opacity: 0.75; clip-path: inset(38% 0 38%); transform: translateX(-4px); }
+  48% { opacity: 0; }
+  54% { opacity: 0.55; clip-path: inset(76% 0 8%); transform: translateX(2px); }
+  60% { opacity: 0; }
+}
+
+.spark-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.9); filter: blur(4px); }
+  to { opacity: 1; transform: scale(1.1); filter: blur(0); }
+}
+
+
+h3.pop {
+
+  font-size: clamp(2rem, 3vw, 3rem);
+  font-weight: 300;
+  color: white;
+  text-align: center;
+  -webkit-text-stroke: 2px white;
+  letter-spacing: 2px;
+  margin-top: 30vh; /* mittig auf der Seite */
+}
+
+/* --- Anpassung bei kleineren Displays --- */
+
+/* Kleine Tablets und große Handys */
+@media (max-height: 800px) {
+  h3.pop {
+    bottom: 30%;
+    font-size: clamp(1.3rem, 4vw, 2.5rem);
+  }
+}
+
+/* Normale Smartphones (z. B. iPhone) */
+@media (max-height: 700px) {
+  h3.pop {
+    bottom: 35%;
+    font-size: clamp(1.2rem, 2vw, 2.2rem);
+  }
+}
+
+/* Sehr kleine Displays (z. B. alte Geräte) */
+@media (max-height: 600px) {
+  h3.pop {
+    bottom: 10%;
+    font-size: clamp(1.2rem, 2vw, 1rem);
+  }
+}
+
+
+
+h4.pop {
+  position: absolute;
+  left: 50%;          /* horizontale Positionierung */
+  bottom: 35%;        /* Unterkante auf Linie */
+  transform: translate(-50%, 50%) rotate(90deg) scale(0); /* start mit 90 Grad Drehung */
+  font-size: clamp(1rem, 2vw, 2rem);
+  font-weight: 300;
+  color: #ffffff;
+  z-index: 1;
+  animation: h2-pop-energy 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+
+
+
+/*Buttons*/
+
+.contact-button {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;                    /* horizontal zentrieren */
+  transform: translateX(-50%);  /* exakt in der Mitte */
+  background-color: #ff66007b;
+  color: #fff;
+  padding: 10px 20px;
+  text-decoration: none;
+  font-weight: bold;
+  border-radius: 5px;
+  z-index: 1000;
+  opacity: 1;                   /* für Fade-In/Fade-Out */
+  transition: opacity 0.5s ease, background-color 0.3s;
+  pointer-events: auto;
+}
+
+.contact-button:hover {
+  background-color: #c7520a;    
+}
+
+/*Home button*/
+
+.home-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.3s, opacity 0.5s, background 0.5s, backdrop-filter 0.5s;
+  opacity: 1;
+  background: rgba(255, 255, 255, 0); /* neutral im Normalzustand */
+}
+
+.home-button img {
+  width: 60%;
+  height: 60%;
+  z-index: 2;
+}
+
+.home-button:hover {
+  transform: scale(0.9) rotate(-15deg);
+
+  /* ✨ Nur beim Hover: Blur + radialer Verlauf */
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.142) 0%,    /* heller Kern */
+    rgba(255, 255, 255, 0.15) 40%,  /* Verlauf */
+    rgba(255, 255, 255, 0,02) 70%      /* weiches Auslaufen */
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  /* optional Glow nach außen */
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
+}
+
+
+/* 📱 Anpassung für Tablets und Handys */
+@media (max-width: 1024px) {
+  .home-button {
+    top: 3vw;
+    right: 3vw;
+    width: 80px;
+    height: 80px;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-button {
+    top: 3vw;
+    right: 3vw;
+    width: 80px;
+    height: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-button {
+    top: 3vw;
+    right: 3vw;
+    width: 80px;
+    height: 80px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loader,
+  .page-loader.is-flashing,
+  .page-loader.is-flashing .page-loader__spinner,
+  .hearthstone-title {
+    transition-duration: 0.01ms;
+  }
+
+  .page-loader__spinner {
+    animation: none;
+  }
+
+  .logo-revealed .logo-z,
+  .logo-revealed .logo-z::before,
+  .logo-revealed .logo-z::after {
+    animation: none;
+  }
+
+  .spark-canvas {
+    display: none;
+  }
+}
